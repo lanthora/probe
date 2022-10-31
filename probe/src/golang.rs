@@ -1,11 +1,13 @@
-use aya::{
-    programs::{ProgramError, UProbe},
-    Bpf,
-};
-
+use anyhow::Ok;
+use aya::{programs::UProbe, Bpf};
 use object::{Object, ObjectSymbol};
 use std::{fs, io};
 use thiserror::Error;
+
+const SEGMENT_START: u64 = 0x400000;
+
+#[derive(Debug, Clone)]
+struct DoubleError;
 
 #[derive(Error, Debug)]
 enum ResolveSymbolError {
@@ -30,14 +32,19 @@ fn resolve_symbol(path: &str, symbol: &str) -> Result<u64, ResolveSymbolError> {
         .ok_or_else(|| ResolveSymbolError::Unknown(symbol.to_string()))
 }
 
-pub(super) fn load_and_attach(bpf: &mut Bpf) -> Result<(), ProgramError> {
-    let target = "/path/to/go/elf";
+pub(super) fn load_and_attach(bpf: &mut Bpf, opt: &mut crate::Opt) -> Result<(), anyhow::Error> {
+    let pid = match opt.pid {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+
     let symbol = "runtime.casgstatus";
-    let offset = resolve_symbol(&target, symbol).unwrap();
+    let target = format!("/proc/{}/exe", pid);
+    let offset = resolve_symbol(&target, symbol)?;
 
     let fn_name = "golang_runtime_casgstatus";
     let program: &mut UProbe = bpf.program_mut(fn_name).unwrap().try_into()?;
     program.load()?;
-    program.attach(None, offset - 0x400000, target, None)?;
+    program.attach(None, offset - SEGMENT_START, target, None)?;
     return Ok(());
 }
