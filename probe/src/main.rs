@@ -3,6 +3,7 @@ use aya_log::BpfLogger;
 use log::{info, warn, LevelFilter};
 use tokio::signal;
 
+mod golang;
 mod openssl;
 
 #[tokio::main]
@@ -26,6 +27,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     openssl::load_and_attach(&mut bpf)?;
+    golang::load_and_attach(&mut bpf)?;
 
     info!("Waiting for Ctrl-C...");
     signal::ctrl_c().await?;

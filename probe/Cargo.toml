@@ -14,6 +14,8 @@ env_logger = "0.9"
 libc = "0.2.102"
 log = "0.4"
 tokio = { version = "1.18", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
+object = "0.28"
+thiserror = "1"
 
 [[bin]]
 name = "probe"

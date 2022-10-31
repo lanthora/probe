@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+mod golang;
 mod openssl;
 
 #[panic_handler]
