@@ -38,13 +38,27 @@ pub(super) fn load_and_attach(bpf: &mut Bpf, opt: &mut crate::Opt) -> Result<(),
         None => return Ok(()),
     };
 
-    let symbol = "runtime.casgstatus";
     let target = format!("/proc/{}/exe", pid);
-    let offset = resolve_symbol(&target, symbol)?;
+    let target = target.as_str();
 
-    let fn_name = "golang_runtime_casgstatus";
+    let symbol = "runtime.casgstatus";
+    let offset = resolve_symbol(&target, symbol)?;
+    let fn_name = "enter_golang_runtime_casgstatus";
     let program: &mut UProbe = bpf.program_mut(fn_name).unwrap().try_into()?;
     program.load()?;
     program.attach(None, offset - SEGMENT_START, target, None)?;
+
+    let symbol = "runtime.newproc1";
+    let offset = resolve_symbol(&target, symbol)?;
+    let fn_name = "enter_golang_runtime_newproc1";
+    let program: &mut UProbe = bpf.program_mut(fn_name).unwrap().try_into()?;
+    program.load()?;
+    program.attach(None, offset - SEGMENT_START, target, None)?;
+
+    let fn_name = "exit_golang_runtime_newproc1";
+    let program: &mut UProbe = bpf.program_mut(fn_name).unwrap().try_into()?;
+    program.load()?;
+    program.attach(None, offset - SEGMENT_START, target, None)?;
+
     return Ok(());
 }
