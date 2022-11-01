@@ -44,16 +44,16 @@ unsafe fn try_enter_golang_runtime_newproc1(ctx: ProbeContext) -> Result<u32, u3
 // func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
 unsafe fn try_exit_golang_runtime_newproc1(ctx: ProbeContext) -> Result<u32, u32> {
     let id = bpf_get_current_pid_tgid();
+    let newgp: usize = (*ctx.regs).rax as usize;
+    let newid = get_goid_from_g(newgp);
+    let pid = id as u32;
     if let Some(callerid) = PID_TGID_CALLERID_MAP.get(&id) {
-        let newgp: usize = (*ctx.regs).rax as usize;
-        let newid = get_goid_from_g(newgp);
-        let pid = id as u32;
         info!(
             &ctx,
-            "newproc: pid={} callerid={} newid={}", pid, callerid, newid
+            "newproc: pid={}, callerid={}, newid={}", pid, callerid, newid
         );
     }
-
+    PID_TGID_CALLERID_MAP.remove(&id).ok();
     Ok(0)
 }
 
