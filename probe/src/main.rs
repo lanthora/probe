@@ -6,6 +6,7 @@ use tokio::signal;
 
 mod golang;
 mod openssl;
+mod syscall;
 
 #[derive(Debug, Parser)]
 pub struct Opt {
@@ -35,8 +36,9 @@ async fn main() -> Result<(), anyhow::Error> {
         warn!("failed to initialize eBPF logger: {}", e);
     }
 
-    openssl::load_and_attach(&mut bpf, &mut opt).ok();
-    golang::load_and_attach(&mut bpf, &mut opt).ok();
+    openssl::load_and_attach(&mut bpf, &mut opt)?;
+    golang::load_and_attach(&mut bpf, &mut opt)?;
+    syscall::load_and_attach(&mut bpf, &mut opt)?;
 
     info!("Waiting for Ctrl-C...");
     signal::ctrl_c().await?;
