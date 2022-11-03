@@ -1,6 +1,10 @@
 #![no_std]
 #![no_main]
 
+const ENOMEM: i32 = 12;
+const EACCES: i32 = 13;
+const EINVAL: i32 = 22;
+
 mod golang;
 mod openssl;
 
