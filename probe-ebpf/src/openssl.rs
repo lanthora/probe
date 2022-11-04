@@ -7,6 +7,8 @@ use aya_bpf::{
 
 use aya_log_ebpf::trace;
 
+use crate::{EACCES, EINVAL, ENOMEM};
+
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
 pub struct SSLCtx {
@@ -23,33 +25,31 @@ const FD_RBIO_OFFSET: usize = 0x30;
 
 unsafe fn get_fd_from_ssl(ssl: usize) -> Result<i32, i32> {
     let rbio = (ssl + RBIO_SSL_OFFSET) as *const usize;
-    let rbio = bpf_probe_read(rbio).or(Err(-crate::ENOMEM))?;
+    let rbio = bpf_probe_read(rbio).or(Err(-ENOMEM))?;
     let fd = (rbio + FD_RBIO_OFFSET) as *const i32;
-    let fd = bpf_probe_read(fd).or(Err(-crate::ENOMEM))?;
+    let fd = bpf_probe_read(fd).or(Err(-ENOMEM))?;
     Ok(fd)
 }
 
 // int SSL_write(SSL *ssl, const void *buf, int num);
 unsafe fn try_enter_openssl_write(ctx: ProbeContext) -> Result<i32, i32> {
-    let ssl: usize = ctx.arg(0).ok_or(-crate::EINVAL)?;
-    let buf: usize = ctx.arg(1).ok_or(-crate::EINVAL)?;
-    let num: i32 = ctx.arg(2).ok_or(-crate::EINVAL)?;
+    let ssl: usize = ctx.arg(0).ok_or(-EINVAL)?;
+    let buf: usize = ctx.arg(1).ok_or(-EINVAL)?;
+    let num: i32 = ctx.arg(2).ok_or(-EINVAL)?;
 
     let id = bpf_get_current_pid_tgid();
     let ssl_ctx = SSLCtx { ssl, buf, num };
-    SSL_CTX_MAP
-        .insert(&id, &ssl_ctx, 0)
-        .or(Err(-crate::ENOMEM))?;
+    SSL_CTX_MAP.insert(&id, &ssl_ctx, 0).or(Err(-ENOMEM))?;
     Ok(0)
 }
 
 // int SSL_write(SSL *ssl, const void *buf, int num);
 unsafe fn try_exit_openssl_write(ctx: ProbeContext) -> Result<i32, i32> {
-    let retval: i32 = ctx.ret().ok_or(-crate::EINVAL)?;
+    let retval: i32 = ctx.ret().ok_or(-EINVAL)?;
 
     let id = bpf_get_current_pid_tgid();
-    let ssl_ctx = SSL_CTX_MAP.get(&id).ok_or(-crate::EACCES)?;
-    SSL_CTX_MAP.remove(&id).or(Err(-crate::EACCES))?;
+    let ssl_ctx = SSL_CTX_MAP.get(&id).ok_or(-EACCES)?;
+    SSL_CTX_MAP.remove(&id).or(Err(-EACCES))?;
 
     let fd = get_fd_from_ssl(ssl_ctx.ssl)?;
 
@@ -68,15 +68,13 @@ unsafe fn try_exit_openssl_write(ctx: ProbeContext) -> Result<i32, i32> {
 
 // int SSL_read(SSL *ssl, void *buf, int num);
 unsafe fn try_enter_openssl_read(ctx: ProbeContext) -> Result<i32, i32> {
-    let ssl: usize = ctx.arg(0).ok_or(-crate::EINVAL)?;
-    let buf: usize = ctx.arg(1).ok_or(-crate::EINVAL)?;
-    let num: i32 = ctx.arg(2).ok_or(-crate::EINVAL)?;
+    let ssl: usize = ctx.arg(0).ok_or(-EINVAL)?;
+    let buf: usize = ctx.arg(1).ok_or(-EINVAL)?;
+    let num: i32 = ctx.arg(2).ok_or(-EINVAL)?;
 
     let id = bpf_get_current_pid_tgid();
     let ssl_ctx = SSLCtx { ssl, buf, num };
-    SSL_CTX_MAP
-        .insert(&id, &ssl_ctx, 0)
-        .or(Err(-crate::ENOMEM))?;
+    SSL_CTX_MAP.insert(&id, &ssl_ctx, 0).or(Err(-ENOMEM))?;
     Ok(0)
 }
 
@@ -84,10 +82,10 @@ unsafe fn try_enter_openssl_read(ctx: ProbeContext) -> Result<i32, i32> {
 unsafe fn try_exit_openssl_read(ctx: ProbeContext) -> Result<i32, i32> {
     let id = bpf_get_current_pid_tgid();
 
-    let ssl_ctx = SSL_CTX_MAP.get(&id).ok_or(-crate::EACCES)?;
-    SSL_CTX_MAP.remove(&id).or(Err(-crate::EACCES))?;
+    let ssl_ctx = SSL_CTX_MAP.get(&id).ok_or(-EACCES)?;
+    SSL_CTX_MAP.remove(&id).or(Err(-EACCES))?;
 
-    let retval: i32 = ctx.ret().ok_or(-crate::EINVAL)?;
+    let retval: i32 = ctx.ret().ok_or(-EINVAL)?;
     if retval > 0 {
         let fd = get_fd_from_ssl(ssl_ctx.ssl)?;
 
