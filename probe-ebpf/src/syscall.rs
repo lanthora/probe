@@ -7,7 +7,7 @@ use aya_bpf::{
 
 use aya_log_ebpf::info;
 
-use crate::{golang::get_logical_goid, EACCES, EINVAL, ENOMEM};
+use crate::{golang::get_logical_goid, socket::fd_to_socket, EACCES, EINVAL, ENOMEM};
 
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
@@ -59,10 +59,7 @@ unsafe fn try_sys_exit_read(ctx: TracePointContext) -> Result<i32, i32> {
         return Err(-EACCES);
     }
 
-    // FIXME: 需要确定是网络用的 socket 才能继续下去.
-    if ret < 10 {
-        return Err(-EACCES);
-    }
+    fd_to_socket(&ctx, rw_ctx.fd as i32)?;
 
     let goid = get_logical_goid()?;
     info!(&ctx, "read: goid={}, fd={}, ret={}", goid, rw_ctx.fd, ret);
@@ -81,10 +78,7 @@ unsafe fn try_sys_exit_write(ctx: TracePointContext) -> Result<i32, i32> {
         return Err(-EACCES);
     }
 
-    // FIXME: 需要确定是网络用的 socket 才能继续下去.
-    if ret < 10 {
-        return Err(-EACCES);
-    }
+    fd_to_socket(&ctx, rw_ctx.fd as i32)?;
 
     let goid = get_logical_goid()?;
     info!(&ctx, "write: goid={}, fd={}, ret={}", goid, rw_ctx.fd, ret);

@@ -33,12 +33,12 @@ fn resolve_symbol(path: &str, symbol: &str) -> Result<u64, ResolveSymbolError> {
 }
 
 pub(super) fn load_and_attach(bpf: &mut Bpf, opt: &mut crate::Opt) -> Result<(), anyhow::Error> {
-    let pid = match opt.pid {
-        Some(v) => v,
-        None => return Ok(()),
-    };
+    let pid = opt.pid;
+    if pid.is_none() {
+        return Ok(());
+    }
 
-    let target = format!("/proc/{}/exe", pid);
+    let target = format!("/proc/{}/exe", pid.unwrap());
     let target = target.as_str();
 
     let symbol = "runtime.casgstatus";
@@ -46,19 +46,19 @@ pub(super) fn load_and_attach(bpf: &mut Bpf, opt: &mut crate::Opt) -> Result<(),
     let fn_name = "enter_golang_runtime_casgstatus";
     let program: &mut UProbe = bpf.program_mut(fn_name).unwrap().try_into()?;
     program.load()?;
-    program.attach(None, offset - SEGMENT_START, target, None)?;
+    program.attach(None, offset - SEGMENT_START, target, pid)?;
 
     let symbol = "runtime.newproc1";
     let offset = resolve_symbol(&target, symbol)?;
     let fn_name = "enter_golang_runtime_newproc1";
     let program: &mut UProbe = bpf.program_mut(fn_name).unwrap().try_into()?;
     program.load()?;
-    program.attach(None, offset - SEGMENT_START, target, None)?;
+    program.attach(None, offset - SEGMENT_START, target, pid)?;
 
     let fn_name = "exit_golang_runtime_newproc1";
     let program: &mut UProbe = bpf.program_mut(fn_name).unwrap().try_into()?;
     program.load()?;
-    program.attach(None, offset - SEGMENT_START, target, None)?;
+    program.attach(None, offset - SEGMENT_START, target, pid)?;
 
     return Ok(());
 }

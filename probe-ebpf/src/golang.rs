@@ -29,8 +29,12 @@ static mut GOID_ANCESTOR_MAP: LruHashMap<GoKey, u64> = LruHashMap::with_max_entr
 static mut GOID_RW_TS_MAP: LruHashMap<GoKey, u64> = LruHashMap::with_max_entries(1024, 0);
 
 unsafe fn is_final_ancestor(tgid: u32, goid: u64, now: u64) -> bool {
-    // 60 seconds
-    const TIMEOUT: u64 = 60000000000;
+    // 追溯祖先协程的最大有效时间. 应当略大于接收到最初请求到返回最终响应的时间.
+    // 目前设置为 3 秒. 如果时间过小, 将无法追溯到有效的业务相关的协程.如果时间
+    // 过大, 可能会追溯到业务协程更靠前的协程.
+    // 如果能够确认放入 GOID_RW_TS_MAP 中的数据都是有效的 socket 读写操作,就
+    // 可以增加这个值.
+    const TIMEOUT: u64 = 3000000000;
 
     let key = GoKey(tgid, goid);
     if let Some(ts) = GOID_RW_TS_MAP.get(&key) {

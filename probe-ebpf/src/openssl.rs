@@ -5,7 +5,7 @@ use aya_bpf::{
     programs::ProbeContext,
 };
 
-use aya_log_ebpf::trace;
+use aya_log_ebpf::info;
 
 use crate::{EACCES, EINVAL, ENOMEM};
 
@@ -53,7 +53,7 @@ unsafe fn try_exit_openssl_write(ctx: ProbeContext) -> Result<i32, i32> {
 
     let fd = get_fd_from_ssl(ssl_ctx.ssl)?;
 
-    trace!(
+    info!(
         &ctx,
         "write: ssl={}, buf={}, num={}, retval={}, fd={}",
         ssl_ctx.ssl,
@@ -89,7 +89,7 @@ unsafe fn try_exit_openssl_read(ctx: ProbeContext) -> Result<i32, i32> {
     if retval > 0 {
         let fd = get_fd_from_ssl(ssl_ctx.ssl)?;
 
-        trace!(
+        info!(
             &ctx,
             "read: ssl={}, buf={}, num={}, retval={}, fd={}",
             ssl_ctx.ssl,

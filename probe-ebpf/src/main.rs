@@ -3,6 +3,7 @@
 
 mod golang;
 mod openssl;
+mod socket;
 mod syscall;
 
 const ENOMEM: i32 = 12;
