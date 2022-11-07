@@ -4,6 +4,7 @@ use aya_bpf::{
     maps::LruHashMap,
     programs::ProbeContext,
 };
+use aya_log_ebpf::info;
 
 use crate::{EACCES, ENOMEM};
 
@@ -126,7 +127,10 @@ fn try_exit_golang_runtime_newproc1(ctx: ProbeContext) -> Result<i32, i32> {
     let tgid = (id >> 32) as u32;
     let key = GoKey(tgid, newid);
     unsafe { GOID_ANCESTOR_MAP.insert(&key, &callerid, 0) }.or(Err(-ENOMEM))?;
-
+    info!(
+        &ctx,
+        "newproc: tgid={}, callerid={}, newid={}", tgid, callerid, newid
+    );
     Ok(0)
 }
 
