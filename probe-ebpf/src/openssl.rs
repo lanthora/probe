@@ -1,7 +1,7 @@
 use aya_bpf::{
     helpers::{bpf_get_current_pid_tgid, bpf_probe_read},
     macros::{map, uprobe, uretprobe},
-    maps::HashMap,
+    maps::LruHashMap,
     programs::ProbeContext,
 };
 
@@ -18,7 +18,7 @@ pub struct SSLCtx {
 }
 
 #[map]
-static mut SSL_CTX_MAP: HashMap<u64, SSLCtx> = HashMap::with_max_entries(1024, 0);
+static mut SSL_CTX_MAP: LruHashMap<u64, SSLCtx> = LruHashMap::with_max_entries(1024, 0);
 
 const RBIO_SSL_OFFSET: usize = 0x10;
 const FD_RBIO_OFFSET: usize = 0x30;
@@ -49,7 +49,6 @@ fn try_exit_openssl_write(ctx: ProbeContext) -> Result<i32, i32> {
 
     let id = bpf_get_current_pid_tgid();
     let ssl_ctx = unsafe { SSL_CTX_MAP.get(&id) }.ok_or(-EACCES)?;
-    unsafe { SSL_CTX_MAP.remove(&id) }.or(Err(-EACCES))?;
 
     let fd = get_fd_from_ssl(ssl_ctx.ssl)?;
 
@@ -83,7 +82,6 @@ fn try_exit_openssl_read(ctx: ProbeContext) -> Result<i32, i32> {
     let id = bpf_get_current_pid_tgid();
 
     let ssl_ctx = unsafe { SSL_CTX_MAP.get(&id) }.ok_or(-EACCES)?;
-    unsafe { SSL_CTX_MAP.remove(&id) }.or(Err(-EACCES))?;
 
     let retval: i32 = ctx.ret().ok_or(-EINVAL)?;
     if retval > 0 {

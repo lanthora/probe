@@ -1,7 +1,7 @@
 use aya_bpf::{
     helpers::{bpf_get_current_pid_tgid, bpf_ktime_get_ns, bpf_probe_read},
     macros::{map, uprobe, uretprobe},
-    maps::{HashMap, LruHashMap},
+    maps::LruHashMap,
     programs::ProbeContext,
 };
 
@@ -14,7 +14,7 @@ struct GoKey(u32, u64);
 // TODO: 验证在执行 newproc 时,是否发生 M->P 映射切换
 // 如果不发生,可以直接进行线程号与协程号的映射
 #[map]
-static mut PID_TGID_CALLERID_MAP: HashMap<u64, u64> = HashMap::with_max_entries(1024, 0);
+static mut PID_TGID_CALLERID_MAP: LruHashMap<u64, u64> = LruHashMap::with_max_entries(1024, 0);
 
 // 线程号到协程号的映射,可以在线程执行过程中获取协程号
 #[map]
@@ -54,6 +54,11 @@ pub fn get_opid() -> Result<u64, i32> {
 
     for _ in 0..10 {
         if is_final_ancestor(tgid, ancestor, ts) {
+            // 优化查询,间接祖先设置为直接祖先
+            if goid != ancestor {
+                let key = GoKey(tgid, goid);
+                unsafe { GOID_ANCESTOR_MAP.insert(&key, &ancestor, 0) }.ok();
+            }
             return Ok(ancestor);
         }
 
@@ -117,7 +122,6 @@ fn try_exit_golang_runtime_newproc1(ctx: ProbeContext) -> Result<i32, i32> {
     let newgp: usize = unsafe { *ctx.regs }.rax as usize;
     let newid = get_goid_from_g(newgp)?;
     let callerid = unsafe { PID_TGID_CALLERID_MAP.get(&id) }.ok_or(-EACCES)?;
-    unsafe { PID_TGID_CALLERID_MAP.remove(&id) }.or(Err(-EACCES))?;
 
     let tgid = (id >> 32) as u32;
     let key = GoKey(tgid, newid);
